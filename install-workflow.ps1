@@ -2359,58 +2359,54 @@ Write-Utf8NoBOM (Join-Path $installDir "frontend\src\App.jsx") $appJsx
 Write-Host "[5/6] Configuration des fichiers de règles automatiques globaux..." -ForegroundColor White
 
 $rulesTemplate = @'
-# Antigravity Workspace Rules - Multi-Agent Workflow & 3D Node Map
-
+# Antigravity Rules - Multi-Agent Workflow & 3D Node Map (Token-Optimized)
 You are the Orchestrator (Antigravity / Gemini) for this workspace. For any coding task, follow this exact workflow.
 
 ## 1. Start the visualizer
-Assume the 3D visualizer is NOT running. ALWAYS run the `init-workflow.bat` at the project root first. It launches the backend + frontend, and opens the live 3D map at http://localhost:3000. (Folder trust and tool permissions for Claude Code are handled automatically at launch via `--dangerously-skip-permissions`, so nothing will block on a confirmation prompt.)
-
-The page at http://localhost:3000 is a polished real-time dashboard, not just a graph: a top bar with a file search and live file/folder counts, an agent panel showing each agent's status and current file (green = Antigravity, purple = Claude), and a detail panel (opened by clicking a node or a search result) that shows the file's status badge, size, exported functions/classes and the agent note in a highlighted box. Everything on it is rendered live from the status and notes you emit through `orchestrate.js` — so keep your status current and your notes clear and human-readable. If a file panel shows a "Backend injoignable / port 3001" message, the backend is not running: re-run `init-workflow.bat`.
+- Assume the 3D visualizer is NOT running. ALWAYS run the `init-workflow.bat` at the project root first. It launches the backend + frontend, and opens the live 3D map at http://localhost:3000.
+- Folder trust and tool permissions for Claude Code are handled automatically at launch via `--dangerously-skip-permissions` (pre-approved in `~/.claude.json` by `orchestrate.js`).
+- The page at http://localhost:3000 is a polished real-time dashboard: top bar with file search and live file/folder counts; agent panel showing status and current file (green = Antigravity, purple = Claude); detail panel (opened by clicking a node/search result) showing status badge, size, exports, and agent notes. Everything renders live from status/notes emitted via `orchestrate.js`. If "Backend injoignable / port 3001" is shown, re-run `init-workflow.bat`.
 
 ## 2. Track yourself on the map (MANDATORY)
-- You start as `disconnected`. The moment you begin working, come online:
+- Start status is `disconnected`. Go online immediately at start:
   `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --agent=antigravity --node="" --status=idle`
-- Every time you read, think, plan, or edit, immediately update your node and status:
+- On every read, think, plan, or edit, update status and node path:
   `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --agent=antigravity --node="[RELATIVE_FILE_PATH]" --status=[STATUS]`
-- Status meanings:
-  - `planning`: creating/updating plans or checklists (e.g. implementation_plan.md, task.md).
-  - `thinking`: reasoning, brainstorming, or researching a problem.
+- Status values:
+  - `planning`: creating/updating checklists or plans (e.g. implementation_plan.md, task.md).
+  - `thinking`: reasoning, brainstorming, researching.
   - `analyzing`: reading files, searching directories, analyzing code structure.
   - `coding`: editing files, running tests, writing code.
   - `idle`: waiting for input, or finished.
-- Updating your node emits a glowing light (green for you, purple for Claude) and lights up the whole containment path from the root folder to that file with flowing particles for ~1.5s.
-- When waiting or finished, set `idle` (do NOT set `disconnected` manually — you are still online):
-  `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --agent=antigravity --node="" --status=idle`
+- Node updates trigger a glowing light (green for Antigravity, purple for Claude) and path flow animation (~1.5s).
+- When waiting or finished, set `idle` with `--node=""` (Do not set `disconnected` manually).
 
 ## 3. Save tokens with the map (MANDATORY)
-NEVER open `.agent-map.json` directly — it is thousands of lines. Query it instead:
-- Understand ONE file (its functions, classes, imports and the notes left by earlier agents) WITHOUT reading it:
-  `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --query=node --node="[RELATIVE_FILE_PATH]"`
-- High-level overview of all agents and active/done files:
-  `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --query=summary`
-- List every file and its status:
-  `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --query=files`
-Plan from these summaries and notes; only read a file in full when the map is genuinely not enough.
-
-### CRITICAL NOTE USAGE GUIDELINES:
-- **ALWAYS READ NOTES FIRST**: Before opening or reading any source file, you MUST query the node note using `query=node`. This is mandatory. Reading the file content directly when a note is available is a waste of time and context tokens.
-- **TRUST THE NOTES**: If a note describes the file's behavior, exports, or changes, assume it is correct and build your implementation details around it without re-reading the entire file.
+- NEVER open `.agent-map.json` directly (thousands of lines). Query it instead:
+  - Understand exports, classes, imports, and notes for ONE file:
+    `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --query=node --node="[RELATIVE_FILE_PATH]"`
+  - High-level overview of all agents and active/done files:
+    `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --query=summary`
+  - List every file and its status:
+    `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --query=files`
+- Critical Note Usage Guidelines:
+  - ALWAYS READ NOTES FIRST: Before opening/reading any source file, you MUST query the node note using `query=node`.
+  - TRUST THE NOTES: If a note describes file behavior, exports, or changes, assume it is correct and build around it without re-reading.
 
 ## 4. Delegate code changes to Claude Code (Opus)
-- For ANY code modification, refactor, or file creation, do NOT write the code yourself. Delegate to Claude Code CLI:
+- For ANY code modification, refactor, or file creation, do NOT write the code yourself. Delegate:
   `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --agent=claude --node="[RELATIVE_FILE_PATH]" --task="[VERY DETAILED TASK]" --model=opus`
-- The `--task` value MUST be extremely detailed and complete: exactly what to do, what NOT to do, and every constraint. Never pass a vague value like "Modify". Wrap the whole `--task="..."` in double quotes, and avoid raw `=` and `"` characters inside the task text.
-- A visible Claude window opens automatically, permissions pre-approved, so it never blocks. Claude manages its OWN map status and disconnects itself when done — NEVER set Claude's status yourself.
+- Task instructions: Must be extremely detailed, stating exactly what to do, what not to do, and constraints. Wrap `--task="..."` in double quotes; avoid raw `=` and `"` inside the task text.
+- Claude behavior: Permissions are pre-approved so it never blocks. Claude manages its own status and disconnects itself when done — NEVER set Claude's status yourself.
 
 ## 5. Record notes to help the next agent (saves tokens later)
-After a meaningful change, leave a one-line summary on the file's node so future agents (and you) can skip re-reading it:
-  `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --agent=antigravity --node="[RELATIVE_FILE_PATH]" --note="[concise summary of the file's purpose and key exports]"`
+- After any change, save a 1-line summary note on the file's node:
+  `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --agent=antigravity --node="[RELATIVE_FILE_PATH]" --note="[concise summary]"`
+- Critical Note Saving Guidelines:
+  - MANDATORY NOTE SAVING: You MUST write a note for every file you modify or create.
+  - WHAT TO INCLUDE: Specific, concise 1-line note (functions/classes exported, queried DB tables, logic). Example: `Exports validateUser() and authMiddleware() for JWT verification.`
+  - PERSISTENCE: Saved locally in `.agent-map.json` and globally in `%USERPROFILE%\custom-workflow\global-notes.json` (persists across resets).
 
-### CRITICAL NOTE SAVING GUIDELINES:
-- **MANDATORY NOTE SAVING**: You MUST write a note for every file you modify or create. Leaving a file without a note is a failure of the workflow.
-- **WHAT TO INCLUDE**: Be specific but extremely concise (1 line). Mention what functions/classes are exported, what database tables are queried, or what logic it performs. Example: `Exports validateUser() and authMiddleware() for JWT verification.`
-- **PERSISTENCE**: These notes are saved both locally in `.agent-map.json` and globally in `%USERPROFILE%\custom-workflow\global-notes.json`. They persist even if the project is reset or re-initialized.
 '@
 $rulesContent = $rulesTemplate.Replace('INSTALL_DIR', $installDir)
 
