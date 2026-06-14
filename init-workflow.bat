@@ -51,6 +51,6 @@ start /b /d "%installDir%\frontend" cmd /c npm run dev
 
 :: Ouverture du navigateur avec un ping d'attente compatible avec la redirection
 ping -n 4 127.0.0.1 >nul
-start http://localhost:3000
+start "" "http://localhost:3000"
 echo [+] Graphe 3D et Agents initialises !
 cmd /k
