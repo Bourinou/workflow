@@ -256,7 +256,7 @@ async function run() {
   const orchestratorPath = __filename.replace(/\\/g, '/');
   const safeProjectPath = projectPath.replace(/\\/g, '/');
 
-  const prompt = `You are Claude Code (Opus), an expert software engineer acting as a delegated sub-agent in a multi-agent workflow orchestrated by Antigravity (Gemini).
+  const prompt = `You are Claude Code, an expert software engineer acting as a delegated sub-agent in a multi-agent workflow orchestrated by Antigravity (Gemini).
 
 === TASK ===
 ${task}
@@ -266,36 +266,23 @@ TARGET FILE: ${node || '(choose the right file from the task)'}
 
 This project has a live 3D "agent map" that already knows every file, its functions/classes, its import connections and notes left by previous agents. Use the map to work efficiently instead of re-reading the whole codebase.
 
-A human is watching a polished real-time dashboard (http://localhost:3000) that renders directly from the data you emit: your agent card shows your live status and the file you are on (purple = Claude), the searchable detail panel surfaces each file's status badge, exported functions/classes and — prominently, in a highlighted box — the note you leave. Treat status updates and notes as user-facing: keep status current, and write notes that are clear and useful to a human reading them, not just to the next agent.
+A human is watching a polished real-time dashboard (http://localhost:3000) that renders directly from the data you emit: your agent card shows your live status and the file you are on (purple = Claude). Keep that position accurate so the human can follow which file you are editing.
 
-## Report your position on the map (you run these yourself)
-You manage your own status; Antigravity will NOT do it for you. Update it often so the dashboard stays accurate.
-  - When you start editing:
-    node "${orchestratorPath}" --project="${safeProjectPath}" --agent=claude --node="${node}" --status=coding
-  - When you switch activity, change the status (and node) accordingly:
-    node "${orchestratorPath}" --project="${safeProjectPath}" --agent=claude --node="<relative/path>" --status=[thinking|planning|analyzing]
-  - As your VERY LAST action before finishing, always disconnect:
-    node "${orchestratorPath}" --project="${safeProjectPath}" --agent=claude --node="" --status=disconnected
+## Show your position on the map (you run these yourself — keep it MINIMAL)
+You manage your own map presence; Antigravity will NOT do it for you. Do ONLY these three things, nothing else:
+  1. When you START working, mark yourself coding on your first file:
+     node "${orchestratorPath}" --project="${safeProjectPath}" --agent=claude --node="${node}" --status=coding
+  2. Each time you move on to MODIFY A DIFFERENT file, rerun the same command with the new file path so the map follows you:
+     node "${orchestratorPath}" --project="${safeProjectPath}" --agent=claude --node="<new/file/path>" --status=coding
+  3. As your VERY LAST action before finishing, disconnect:
+     node "${orchestratorPath}" --project="${safeProjectPath}" --agent=claude --node="" --status=disconnected
+Do NOT emit any other status (no thinking / analyzing / planning) and do NOT run map commands for anything else — every extra call costs tokens.
 
-## Save tokens with the map (do this BEFORE opening any file)
-Never read ".agent-map.json" directly (it is huge). Query it instead:
-  - One file's functions, classes, imports and notes, WITHOUT reading the file:
+## Optional: save tokens by querying the map instead of re-reading
+Never open ".agent-map.json" directly (it is huge). If you would otherwise re-read a large file, you MAY query its functions/classes/imports/notes first (this does NOT move you on the map):
     node "${orchestratorPath}" --project="${safeProjectPath}" --query=node --node="<relative/path>"
-  - Overview of agents and active files:
-    node "${orchestratorPath}" --project="${safeProjectPath}" --query=summary
-  - Full list of files and their statuses:
-    node "${orchestratorPath}" --project="${safeProjectPath}" --query=files
-Only open a file in full when the map summary and notes are not enough.
-
-### CRITICAL NOTE USAGE GUIDELINES:
-  - **ALWAYS READ NOTES FIRST**: Before opening or reading a file, you MUST query its node note via \`--query=node\` first. Trust the note's description. Do not read the entire file if a note is available and sufficient.
-
-## Leave a note for the next agent (saves their tokens too)
-After finishing the file, record a one-line summary of what it does / exports:
-    node "${orchestratorPath}" --project="${safeProjectPath}" --agent=claude --node="${node}" --note="<concise summary of this file and its key exports>"
-
-### CRITICAL NOTE SAVING GUIDELINES:
-  - **MANDATORY NOTE SAVING**: You MUST write a note for every file you modify or create. Leaving a file without a note is a failure of the workflow. Keep it to 1 line, summarizing key exports or behaviors.
+Leaving a note is OPTIONAL — only do it if it will genuinely save a future agent from re-reading this file:
+    node "${orchestratorPath}" --project="${safeProjectPath}" --agent=claude --node="${node}" --note="<one-line summary>"
 
 ## Rules
 1. Focus on the TARGET FILE. Read other files only when the map shows you must (imports or callers). Do not create new files unless the task requires it.
@@ -320,7 +307,7 @@ After finishing the file, record a one-line summary of what it does / exports:
     try { fs.unlinkSync(exitFile); } catch (e) {}
   }
 
-  const model = args.model || 'opus';
+  const model = args.model || 'sonnet';
   const q = s => String(s).replace(/'/g, "''");
   
   // Format the prompt as a single-line string and replace all double quotes with single quotes to prevent PowerShell command-line splitting bugs.
@@ -700,6 +687,9 @@ try {
         broadcast({ type: 'GRAPH_UPDATE', data: graph });
       } catch (err) {}
     }, 500);
+  });
+  watcher.on('error', (error) => {
+    if (error.code !== 'EPERM') console.error('Watcher error:', error.message);
   });
 } catch (e) {
   fs.watch(projectPath, { recursive: true }, () => {
@@ -1502,7 +1492,7 @@ function typeColor(type) {
 
 const AGENT_META = {
   antigravity: { name: 'Antigravity', role: 'Orchestrateur — Gemini', css: 'antigravity' },
-  claude: { name: 'Claude Code', role: 'Développeur — Opus 4.8', css: 'claude' }
+  claude: { name: 'Claude Code', role: 'Développeur — Claude', css: 'claude' }
 };
 
 const AGENT_STATUS_LABELS = {
@@ -1952,27 +1942,6 @@ export default function App() {
         group.add(pointLight);
       }
 
-      Object.entries(agents).forEach(([name, data]) => {
-        if (data.currentNode === node.id) {
-          const agentGeo = new THREE.SphereGeometry(2.5, 8, 8);
-          const agentColor = name === 'antigravity' ? ANTIGRAVITY_COLOR : CLAUDE_COLOR;
-          const agentMesh = new THREE.Mesh(agentGeo, new THREE.MeshBasicMaterial({ color: agentColor }));
-          agentMesh.position.set(size + 2.5, 0, 0);
-          group.add(agentMesh);
-        }
-      });
-    }
-
-    if (isFolder) {
-      Object.entries(agents).forEach(([name, data]) => {
-        if (data.currentNode === node.id) {
-          const agentGeo = new THREE.SphereGeometry(2.5, 8, 8);
-          const agentColor = name === 'antigravity' ? ANTIGRAVITY_COLOR : CLAUDE_COLOR;
-          const agentMesh = new THREE.Mesh(agentGeo, new THREE.MeshBasicMaterial({ color: agentColor }));
-          agentMesh.position.set(7.5, 0, 0);
-          group.add(agentMesh);
-        }
-      });
     }
 
     if (activeAgent) {
@@ -2383,6 +2352,7 @@ You are the Orchestrator (Antigravity / Gemini) for this workspace. For any codi
 
 ## 3. Save tokens with the map (MANDATORY)
 - NEVER open `.agent-map.json` directly (thousands of lines). Query it instead:
+- NEVER open `orchestrate.js` — GEMINI.md fully describes it; re-reading wastes tokens.
   - Understand exports, classes, imports, and notes for ONE file:
     `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --query=node --node="[RELATIVE_FILE_PATH]"`
   - High-level overview of all agents and active/done files:
@@ -2393,11 +2363,12 @@ You are the Orchestrator (Antigravity / Gemini) for this workspace. For any codi
   - ALWAYS READ NOTES FIRST: Before opening/reading any source file, you MUST query the node note using `query=node`.
   - TRUST THE NOTES: If a note describes file behavior, exports, or changes, assume it is correct and build around it without re-reading.
 
-## 4. Delegate code changes to Claude Code (Opus)
+## 4. Delegate code changes to Claude Code
 - For ANY code modification, refactor, or file creation, do NOT write the code yourself. Delegate:
-  `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --agent=claude --node="[RELATIVE_FILE_PATH]" --task="[VERY DETAILED TASK]" --model=opus`
-- Task instructions: Must be extremely detailed, stating exactly what to do, what not to do, and constraints. Wrap `--task="..."` in double quotes; avoid raw `=` and `"` inside the task text.
-- Claude behavior: Permissions are pre-approved so it never blocks. Claude manages its own status and disconnects itself when done — NEVER set Claude's status yourself.
+  `node "INSTALL_DIR\orchestrate.js" --project="[WORKSPACE_PATH]" --agent=claude --node="[RELATIVE_FILE_PATH]" --task="[VERY DETAILED TASK]"`
+- Model: defaults to Sonnet. Add `--model=opus` only for complex work. Task must be extremely detailed (what to do, constraints, no `=` or `"` in task text).
+- BLOCKING: command holds terminal until Claude finishes. Don't poll or add timers — just wait. Set your own status=idle before launching.
+- Claude behavior: Permissions pre-approved; Claude manages its own status and disconnects on finish — NEVER set Claude's status yourself.
 
 ## 5. Record notes to help the next agent (saves tokens later)
 - After any change, save a 1-line summary note on the file's node:
@@ -2483,7 +2454,7 @@ start /b /d "%installDir%\backend" cmd /c node server.js "%projPath%"
 start /b /d "%installDir%\frontend" cmd /c npm run dev
 
 :: Ouverture du navigateur avec un ping d'attente compatible avec la redirection
-ping -n 4 127.0.0.1 >nul
+ping -n 8 127.0.0.1 >nul
 start "" "http://localhost:3000"
 echo [+] Graphe 3D et Agents initialises !
 cmd /k

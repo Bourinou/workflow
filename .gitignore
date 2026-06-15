@@ -4,3 +4,6 @@
 !install-workflow.ps1
 !README.md
 !.gitignore
+ 
+GEMINI.md 
+.claude-exit-code.txt 
